@@ -181,6 +181,19 @@ void checkUsbPorts() {
       freeUsbPort(port);
     }
   }
+
+  for (uint8_t port = MP_FIRST_USB_PORT_NUMBER; port <= MP_MAX_USB_PORT_NUMBER; port++) {
+    uint8_t pin_status = nrf_gpio_pin_read(USB_INPUT_STATUS_PIN);
+    NRF_LOG_INFO("checkUsbPorts: pin %d - staatus %d", port, pin_status);
+
+//    if(pin_status){
+//        nrf_gpio_pin_clear(USB_INPUT_CHOOSER_PIN);
+//    }else{
+//        nrf_gpio_pin_set(USB_INPUT_CHOOSER_PIN);
+//    }
+    nrf_gpio_pin_toggle(USB_INPUT_CHOOSER_PIN);
+
+  }
 }
 
 // Max port number set to 4 in test

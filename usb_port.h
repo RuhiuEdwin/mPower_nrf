@@ -46,7 +46,7 @@ typedef struct {
 
 //#define MAX_PORT 10
 #define MP_FIRST_USB_PORT_NUMBER 1
-#define MP_MAX_USB_PORT_NUMBER 4
+#define MP_MAX_USB_PORT_NUMBER 10
 
 //TODO Test data
 #define MP_TEST_TIME                        (0.5*60)  // 6 sek
@@ -56,6 +56,11 @@ typedef struct {
 
 #define MP_POWER_ON 1
 #define MP_POWER_OFF 0
+
+#define USB_OUTPUT_CHOOSER_PIN 10
+#define USB_OUTPUT_STATUS_PIN 11
+#define USB_INPUT_CHOOSER_PIN 22
+#define USB_INPUT_STATUS_PIN 23
 
 void initUsbPorts();
 uint8_t getPort(uint8_t port, UsbPort *data);

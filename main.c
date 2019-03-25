@@ -106,7 +106,7 @@
 
 #define DEAD_BEEF 0xDEADBEEF /**< Value used as error code on stack dump, can be used to identify stack location on stack unwind. */
 
-//pin change handeler
+//pin change handler
 #ifdef BSP_BUTTON_0
 #define PIN_IN_0 BSP_BUTTON_0
 #endif
@@ -144,14 +144,8 @@
 void inPinHandler(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t action) {
     NRF_LOG_INFO("in_pin_handler; pin=%d, action=%d", pin, action);
     
-  switch (pin){
-    case PIN_IN_0:
-    case PIN_IN_1:
-    case PIN_IN_2:
-    case PIN_IN_3:
-      onUsbPortChange(pin - (PIN_IN_START-1), action);
-      break;
-    }
+    onUsbPortChange(pin - (PIN_IN_START-1), action);
+
     //TODO: endring av port status med notifikasjon på ALERT karakteristikk
 }
 
@@ -166,33 +160,26 @@ static void gpio_init(void) {
   err_code = nrf_drv_gpiote_init();
   APP_ERROR_CHECK(err_code);
 
+  NRF_LOG_INFO("GPIO init start");
   nrf_drv_gpiote_out_config_t out_config = GPIOTE_CONFIG_OUT_SIMPLE(false);
-
-  err_code = nrf_drv_gpiote_out_init(PIN_OUT_0, &out_config);
-  APP_ERROR_CHECK(err_code);
-  err_code = nrf_drv_gpiote_out_init(PIN_OUT_1, &out_config);
-  APP_ERROR_CHECK(err_code);
-  err_code = nrf_drv_gpiote_out_init(PIN_OUT_2, &out_config);
-  APP_ERROR_CHECK(err_code);
-  err_code = nrf_drv_gpiote_out_init(PIN_OUT_3, &out_config);
-  APP_ERROR_CHECK(err_code);
-
   nrf_drv_gpiote_in_config_t in_config = GPIOTE_CONFIG_IN_SENSE_TOGGLE(true);
   in_config.pull = NRF_GPIO_PIN_PULLUP;
 
-  err_code = nrf_drv_gpiote_in_init(PIN_IN_0, &in_config, inPinHandler);
+  NRF_LOG_INFO("GPIO init 1");
+  err_code = nrf_drv_gpiote_out_init(USB_INPUT_CHOOSER_PIN, &out_config);
   APP_ERROR_CHECK(err_code);
-  err_code = nrf_drv_gpiote_in_init(PIN_IN_1, &in_config, inPinHandler);
+  err_code = nrf_drv_gpiote_out_init(USB_OUTPUT_CHOOSER_PIN, &out_config);
   APP_ERROR_CHECK(err_code);
-  err_code = nrf_drv_gpiote_in_init(PIN_IN_2, &in_config, inPinHandler);
-  APP_ERROR_CHECK(err_code);
-  err_code = nrf_drv_gpiote_in_init(PIN_IN_3, &in_config, inPinHandler);
+  err_code = nrf_drv_gpiote_out_init(USB_OUTPUT_STATUS_PIN, &out_config);
   APP_ERROR_CHECK(err_code);
 
-  nrf_drv_gpiote_in_event_enable(PIN_IN_0, true);
-  nrf_drv_gpiote_in_event_enable(PIN_IN_1, true);
-  nrf_drv_gpiote_in_event_enable(PIN_IN_2, true);
-  nrf_drv_gpiote_in_event_enable(PIN_IN_3, true);
+  NRF_LOG_INFO("GPIO init 2");
+  err_code = nrf_drv_gpiote_out_init(USB_INPUT_STATUS_PIN, &in_config);
+  APP_ERROR_CHECK(err_code);
+
+  nrf_drv_gpiote_in_event_enable(USB_INPUT_STATUS_PIN, true);
+
+  NRF_LOG_INFO("GPIO init end");
 }
 
 /**@brief   Priority of the application BLE event handler.

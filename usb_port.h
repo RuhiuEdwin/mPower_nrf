@@ -62,6 +62,10 @@ typedef struct {
 #define USB_INPUT_CHOOSER_PIN 22
 #define USB_INPUT_STATUS_PIN 23
 
+#define SHIFT_REGISTER_P0_18 18
+#define SHIFT_REGISTER_P0_19 19
+#define SHIFT_REGISTER_P0_20 20
+
 void initUsbPorts();
 uint8_t getPort(uint8_t port, UsbPort *data);
 uint8_t initPortStatus(uint8_t port, UsbPortStatus status, int16_t ticks, uint16_t handle);

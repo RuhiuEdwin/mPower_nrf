@@ -170,6 +170,52 @@ uint8_t freeUsbPort(uint8_t port) {
   initPortStatus(port, MP_AVAILABLE, 0, BLE_CONN_HANDLE_INVALID);
 }
 
+void resetInputShiftRegister() {
+  // Reset to start on 'Output 1 active' - set P0.19 low - high 
+  nrf_gpio_pin_clear(SHIFT_REGISTER_P0_19);
+  nrf_gpio_pin_set(SHIFT_REGISTER_P0_19);
+  // Repeat sequence to ensure reset is done 
+  nrf_gpio_pin_clear(SHIFT_REGISTER_P0_19);
+  nrf_gpio_pin_set(SHIFT_REGISTER_P0_19);
+  nrf_gpio_pin_clear(SHIFT_REGISTER_P0_19);
+  nrf_gpio_pin_set(SHIFT_REGISTER_P0_19);
+}
+
+void toggleInputShiftRegister(uint8_t port) {
+  resetInputShiftRegister();
+  for (uint8_t i = 1; i < port; i++) {
+    // Toggle P0.18 high/low port-1 times to select port
+    nrf_gpio_pin_set(SHIFT_REGISTER_P0_18);
+    nrf_gpio_pin_clear(SHIFT_REGISTER_P0_18);
+  }
+}
+
+// Check "Output X fault"
+uint8_t checkUsbPortFault(uint8_t port) {
+  //resetInputShiftRegister();
+  toggleInputShiftRegister(port+10);
+  uint8_t fault_status = nrf_gpio_pin_read(SHIFT_REGISTER_P0_20);
+  // Returns 0 if "Output X fault" not has fault.
+  return fault_status;
+}
+
+int8_t readUsbPortStatus(uint8_t port) {
+  int8_t port_status = 0;
+
+  //resetInputShiftRegister();
+  port_status = checkUsbPortFault(port);
+  if (port_status == 0) {
+    toggleInputShiftRegister(port);
+    // Returns 0 (low), if "Output X active" is not activated, and 1 (high) if activated
+    uint8_t pin_status = nrf_gpio_pin_read(SHIFT_REGISTER_P0_20);
+  } else {
+    NRF_LOG_INFO("readUsbPortStatus fault: port %d - status %d", port, port_status);
+    // Output X fault, return -1
+    port_status = -1;
+  }
+  return port_status;
+}
+
 void checkUsbPorts() {
   // Check if any USB ports has used up free chanrging time / charging time
   uint8_t ret;
@@ -183,16 +229,8 @@ void checkUsbPorts() {
   }
 
   for (uint8_t port = MP_FIRST_USB_PORT_NUMBER; port <= MP_MAX_USB_PORT_NUMBER; port++) {
-    uint8_t pin_status = nrf_gpio_pin_read(USB_INPUT_STATUS_PIN);
-    NRF_LOG_INFO("checkUsbPorts: pin %d - staatus %d", port, pin_status);
-
-//    if(pin_status){
-//        nrf_gpio_pin_clear(USB_INPUT_CHOOSER_PIN);
-//    }else{
-//        nrf_gpio_pin_set(USB_INPUT_CHOOSER_PIN);
-//    }
-    nrf_gpio_pin_toggle(USB_INPUT_CHOOSER_PIN);
-
+    int8_t port_status = readUsbPortStatus(port);
+    NRF_LOG_INFO("checkUsbPorts: port %d - status %d", port, port_status);
   }
 }
 

@@ -57,14 +57,14 @@ typedef struct {
 #define MP_POWER_ON 1
 #define MP_POWER_OFF 0
 
-#define USB_OUTPUT_CHOOSER_PIN 10
-#define USB_OUTPUT_STATUS_PIN 11
-#define USB_INPUT_CHOOSER_PIN 22
-#define USB_INPUT_STATUS_PIN 23
-
 #define SHIFT_REGISTER_P0_18 18
 #define SHIFT_REGISTER_P0_19 19
 #define SHIFT_REGISTER_P0_20 20
+
+#define IC_SRCLK_P0_8   8
+#define IC_RCLK_P0_9    9
+#define IC_SER_P0_10    10
+
 
 void initUsbPorts();
 uint8_t getPort(uint8_t port, UsbPort *data);

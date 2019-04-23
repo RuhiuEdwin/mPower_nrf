@@ -166,18 +166,22 @@ static void gpio_init(void) {
   in_config.pull = NRF_GPIO_PIN_PULLUP;
 
   NRF_LOG_INFO("GPIO init 1");
-  err_code = nrf_drv_gpiote_out_init(USB_INPUT_CHOOSER_PIN, &out_config);
+  err_code = nrf_drv_gpiote_out_init(IC_SRCLK_P0_8, &out_config);
   APP_ERROR_CHECK(err_code);
-  err_code = nrf_drv_gpiote_out_init(USB_OUTPUT_CHOOSER_PIN, &out_config);
+  err_code = nrf_drv_gpiote_out_init(IC_RCLK_P0_9, &out_config);
   APP_ERROR_CHECK(err_code);
-  err_code = nrf_drv_gpiote_out_init(USB_OUTPUT_STATUS_PIN, &out_config);
+  err_code = nrf_drv_gpiote_out_init(IC_SER_P0_10, &out_config);
+  APP_ERROR_CHECK(err_code);
+  err_code = nrf_drv_gpiote_out_init(SHIFT_REGISTER_P0_18, &out_config);
+  APP_ERROR_CHECK(err_code);
+  err_code = nrf_drv_gpiote_out_init(SHIFT_REGISTER_P0_19, &out_config);
   APP_ERROR_CHECK(err_code);
 
   NRF_LOG_INFO("GPIO init 2");
-  err_code = nrf_drv_gpiote_out_init(USB_INPUT_STATUS_PIN, &in_config);
+  err_code = nrf_drv_gpiote_in_init(SHIFT_REGISTER_P0_20, &in_config, inPinHandler);
   APP_ERROR_CHECK(err_code);
 
-  nrf_drv_gpiote_in_event_enable(USB_INPUT_STATUS_PIN, true);
+  nrf_drv_gpiote_in_event_enable(SHIFT_REGISTER_P0_20, true);
 
   NRF_LOG_INFO("GPIO init end");
 }

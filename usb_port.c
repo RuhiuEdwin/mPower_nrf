@@ -131,17 +131,86 @@ uint8_t allocateFreePort(uint8_t *port) {
   return MP_ERROR_NO_AVAILABLE_PORT;
 }
 
+uint8_t turnLedOnOff(uint8_t ledOnOff) {
+    // Set SRCLK, RCLK and SER low
+    nrf_gpio_pin_clear(IC_SRCLK_P0_8);
+    nrf_gpio_pin_clear(IC_RCLK_P0_9);
+    nrf_gpio_pin_clear(IC_SER_P0_10);
+
+    if (ledOnOff != 0) {
+      // Set SER high
+      nrf_gpio_pin_set(IC_SER_P0_10);
+    }
+    
+    // Set SRCLK high/low
+    nrf_gpio_pin_set(IC_SRCLK_P0_8);
+    nrf_gpio_pin_clear(IC_SRCLK_P0_8);
+    
+    if (ledOnOff != 0) {
+      // Set SER low
+      nrf_gpio_pin_clear(IC_SER_P0_10);
+    }
+
+    // Turn SRCLK on/off 6 more times
+    for (uint8_t i = 1; i <= 6; i++) {
+      nrf_gpio_pin_set(IC_SRCLK_P0_8);
+      nrf_gpio_pin_clear(IC_SRCLK_P0_8);
+    }
+
+    // Set RCLK high/low to turn on bulb
+    nrf_gpio_pin_set(IC_RCLK_P0_9);
+    nrf_gpio_pin_clear(IC_RCLK_P0_9);
+}
+
 uint8_t turnOnOffPower(uint8_t port, uint8_t onOff) {
   if (port < MP_FIRST_USB_PORT_NUMBER || port > MP_MAX_USB_PORT_NUMBER) {
     return MP_ERROR_ILLEGAL_PORT_NUMBER;
   }
   // The _set function turns the LED off and _clear turns it ON
   //nrf_gpio_pin_write(port - 1 + LED_START, !onOff);
-  if (onOff == MP_POWER_ON) {
-    nrf_gpio_pin_clear(port - 1 + LED_START);
-  } else {
-    nrf_gpio_pin_set(port - 1 + LED_START);
+//  if (onOff == MP_POWER_ON) {
+//    nrf_gpio_pin_clear(port - 1 + LED_START);
+//  } else {
+//    nrf_gpio_pin_set(port - 1 + LED_START);
+//  }
+
+  nrf_gpio_pin_clear(IC_SRCLK_P0_8);
+  nrf_gpio_pin_clear(IC_RCLK_P0_9);
+  nrf_gpio_pin_clear(IC_SER_P0_10);
+  
+  // Turn SRCLK on/off n (port * 2) times
+  for (uint8_t i = MP_MAX_USB_PORT_NUMBER; i >= MP_FIRST_USB_PORT_NUMBER ; i--) {
+    if (port == i) {
+      NRF_LOG_INFO("turnOnOffPower: this port=%d, on/off=%d", port, onOff);
+      if (onOff == MP_POWER_ON) {
+        // Set SER low
+        nrf_gpio_pin_set(IC_SER_P0_10);
+      } else {
+        // Set SER low
+        nrf_gpio_pin_clear(IC_SER_P0_10);
+      }
+    }
+    else {
+      uint8_t status;
+      if (getPortStatus(port, &status) != MP_SUCCESS)
+        break;
+
+      NRF_LOG_INFO("turnOnOffPower: port=%d, status=%d", i, status);
+      if (status == MP_FREE_CHARGE || status == MP_ACTIVE_CHARGE) {
+        // Set SER low
+        nrf_gpio_pin_set(IC_SER_P0_10);
+      } else {
+        // Set SER low
+        nrf_gpio_pin_clear(IC_SER_P0_10);
+      }
+    }
+    nrf_gpio_pin_set(IC_SRCLK_P0_8);
+    nrf_gpio_pin_clear(IC_SRCLK_P0_8);
   }
+
+  // Set RCLK high/low to turn power on
+  nrf_gpio_pin_set(IC_RCLK_P0_9);
+  nrf_gpio_pin_clear(IC_RCLK_P0_9);
 
   return MP_SUCCESS;
 }
@@ -216,6 +285,8 @@ int8_t readUsbPortStatus(uint8_t port) {
   return port_status;
 }
 
+static uint8_t poll_counter = 0;
+
 void checkUsbPorts() {
   // Check if any USB ports has used up free chanrging time / charging time
   uint8_t ret;
@@ -228,10 +299,16 @@ void checkUsbPorts() {
     }
   }
 
-  for (uint8_t port = MP_FIRST_USB_PORT_NUMBER; port <= MP_MAX_USB_PORT_NUMBER; port++) {
-    int8_t port_status = readUsbPortStatus(port);
-    NRF_LOG_INFO("checkUsbPorts: port %d - status %d", port, port_status);
+  turnLedOnOff(poll_counter % 2);
+
+  if (poll_counter++ == 2) {
+    poll_counter = 0;
+    for (uint8_t port = MP_FIRST_USB_PORT_NUMBER; port <= MP_MAX_USB_PORT_NUMBER; port++) {
+      int8_t port_status = readUsbPortStatus(port);
+      NRF_LOG_INFO("checkUsbPorts: port %d - status %d", port, port_status);
+    }
   }
+
 }
 
 // Max port number set to 4 in test

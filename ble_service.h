@@ -9,10 +9,6 @@
 
 // FROM_SERVICE_TUTORIAL: Defining 16-bit service and 128-bit base UUIDs
 // UUID: 0000f00d-6cc7-425b-ad67-fcafcda33672 // 128-bit base UUID
-// UUID: 0000f00d-6cc7-425b-ad67-fccdafa33672 // 128-bit base UUID
-//#define BLE_UUID_MP_BASE        {{0x72, 0x36, 0xA3, 0xAF, 0xCD, 0xFC, 0x67, 0xAD, 0x5B, 0x42, 0xC7, 0x6C, 0xCD, 0x46, 0xDF, 0x21}} // 128-bit base UUID
-//#define BLE_UUID_MP_BASE        {0x72, 0x36, 0xA3, 0xAF, 0xCD, 0xFC, 0x67, 0xAD,\
-//                                 0x5B, 0x42, 0xC7, 0x6C, 0x00, 0x00, 0x00, 0x00} // 128-bit base UUID
 #define BLE_UUID_MP_BASE        {0x72, 0x36, 0xA3, 0xAF, 0xCD, 0xFC, 0x67, 0xAD,\
                                  0x5B, 0x42, 0xC7, 0x6C, 0x00, 0x00, 0x00, 0x00} // 128-bit base UUID
 #define BLE_UUID_MP_SERVICE     0xF00D                                                                   // Just a random, but recognizable value
@@ -34,7 +30,7 @@ typedef struct
   ble_gatts_char_handles_t cmd_char_handles;
   ble_gatts_char_handles_t alert_char_handles;
   uint8_t uuid_type; /**< UUID type for the MP Service. */
-    uint8_t                     location_id;
+  uint8_t location_id;
 } ble_mp_t;
 
 /**@brief Function for handling BLE Stack events related to our service and characteristic.

@@ -186,14 +186,14 @@ uint8_t turnLedOnOff(uint8_t led, uint8_t onOff) {
     }
     else if (pin_map[i][0] >= LED_START && pin_map[i][0] <= LED_STOP) {
       if (pin_map[i][0] == led) {
-        pin_map[i][0] = onOff;
+        pin_map[i][1] = onOff;
       }
       else {
         // TODO: get LED state
-        //pin_map[i][0] = getLedState(led);
+        //pin_map[i][1] = getLedState(led);
       }
     }
-    NRF_LOG_INFO("turnLedOnOff: pin=%d, on/off=%d", i, pin_map[i][1]);
+    //NRF_LOG_INFO("turnLedOnOff: pin=%d, on/off=%d", i, pin_map[i][1]);
     if (pin_map[i][1] == MP_POWER_ON){
       nrf_delay_ms(MP_GPIO_DELAY);
       nrf_gpio_pin_set(IC_SER_P0_10);
@@ -246,9 +246,9 @@ uint8_t turnPowerOnOff(uint8_t port, uint8_t onOff) {
     }
     else if (pin_map[i][0] >= LED_START && pin_map[i][0] <= LED_STOP) {
       // TODO: get LED state
-      //pin_map[i][0] = getLedState(led);
+      //pin_map[i][1] = getLedState(led);
     }
-    NRF_LOG_INFO("turnPowerOnOff: pin=%d, on/off=%d", i, pin_map[i][1]);
+    //NRF_LOG_INFO("turnPowerOnOff: pin=%d, on/off=%d", i, pin_map[i][1]);
     if (pin_map[i][1] == MP_POWER_ON){
       nrf_delay_ms(MP_GPIO_DELAY);
       nrf_gpio_pin_set(IC_SER_P0_10);
@@ -353,7 +353,7 @@ int8_t readUsbPortStatus(uint8_t port) {
 static uint8_t poll_counter = 0;
 
 void checkUsbPorts() {
-  // Check if any USB ports has used up free chanrging time / charging time
+  // Check if any USB ports have used up free charging time / charging time
   uint8_t ret;
   int16_t ticks;
 
@@ -364,7 +364,8 @@ void checkUsbPorts() {
     }
   }
 
-  //turnLedOnOff(poll_counter % 2);
+  // Just for testing
+  //turnLedOnOff(LED_1, poll_counter % 2);
 
   if (poll_counter++ == 2) {
     poll_counter = 0;
@@ -376,11 +377,8 @@ void checkUsbPorts() {
 
 }
 
-// Max port number set to 4 in test
-// Moved defines to our_service.h
-
 void onNewCommand(ble_evt_t const *p_ble_evt) {
-  // Edgar: Write event - decode the data set by client:
+  // Write event - decode the data set by client:
   // 1st byte: command - 0=off, 1=on
   // 2nd byte: port number
   //           legal port number is: 1 - MAX_USB_PORT_NUMBER
@@ -450,20 +448,6 @@ void onNewCommand(ble_evt_t const *p_ble_evt) {
 
     } else if (command == MP_TURN_USB_POWER_OFF) {
       NRF_LOG_INFO("Turn power OFF on port 0x%x", port);
-
-      /*
-            if (portStatus != MP_ACTIVE_CHARGE) {
-              NRF_LOG_INFO("Illegal port status, portstatus=%d", portStatus)
-              ret = MP_ERROR_ILLEGAL_PORT_STATUS;
-            } else {
-              ret = turnPowerOnOff(port, MP_POWER_OFF);
-
-              // update port status
-              // TODO CHANGE TIME TO ACTUAL CHARGE TIME
-              ret = initPortStatus(port, MP_AVAILABLE, MP_TEST_TIME, connHandle);
-            }
-            */
-
       ret = turnPowerOnOff(port, MP_POWER_OFF);
 
       // update port status
@@ -557,7 +541,7 @@ void _onUsbPortChange(uint8_t port, uint8_t action) {
 
       case MP_FREE_CHARGE:
         // Disconnected - not paid for
-        // Should block for some time to prevent misuse
+        // Should block port for some time to prevent misuse
         break;
 
       case MP_FREE_CHARGE_NOT_AVAILABLE:
@@ -580,7 +564,7 @@ void _onUsbPortChange(uint8_t port, uint8_t action) {
 
       case MP_FREE_CHARGE:
         // Disconnected - not paid for
-        // Should block for some time to prevent misuse
+        // Should block port for some time to prevent misuse
         break;
 
       case MP_FREE_CHARGE_NOT_AVAILABLE:

@@ -144,7 +144,7 @@
 void inPinHandler(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t action) {
     NRF_LOG_INFO("in_pin_handler; pin=%d, action=%d", pin, action);
     
-    onUsbPortChange(pin - (PIN_IN_START-1), action);
+    //onUsbPortChange(pin - (PIN_IN_START-1), action);
 
     //TODO: endring av port status med notifikasjon på ALERT karakteristikk
 }

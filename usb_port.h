@@ -47,12 +47,13 @@ typedef struct {
 //#define MAX_PORT 10
 #define MP_FIRST_USB_PORT_NUMBER 1
 #define MP_MAX_USB_PORT_NUMBER 10
+#define MP_GPIO_DELAY 3          // ms to wait before executing GPIO operation
 
 //TODO Test data
-#define MP_TEST_TIME                        (0.5*60)  // 6 sek
-#define MP_MAX_CHARGE_TIME                  (MP_TEST_TIME)//(60*60) // 1 time
-#define MP_MAX_FREE_TIME                    (MP_TEST_TIME)//(5*60)  // 5 min
-#define MP_FREE_CHARGE_NOT_AVAILABLE_TIME   (MP_TEST_TIME)//(60*60) // 1 time
+#define MP_TEST_TIME                        (0.5*60)        // 6 sek
+#define MP_MAX_CHARGE_TIME                  (MP_TEST_TIME)  //(60*60) // 1 time
+#define MP_MAX_FREE_TIME                    (MP_TEST_TIME)  //(5*60)  // 5 min
+#define MP_FREE_CHARGE_NOT_AVAILABLE_TIME   (MP_TEST_TIME)  //(60*60) // 1 time
 
 #define MP_POWER_ON 1
 #define MP_POWER_OFF 0

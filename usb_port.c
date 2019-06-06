@@ -28,15 +28,26 @@ void clearOutputPins(bool boot);
 
 UsbPort *usbPorts[MP_MAX_USB_PORT_NUMBER + 1];
 
-#define MP_PORT  0
-#define MP_STATE        1
+#define MP_PORT   0
+#define MP_STATE  1
 
 //Pins 1-16: p8, p7, p6, p5, p4, p3, p2, p1, status_led1, status_led2, status_led3, power1, power2, power3, p10, p9.
-static uint8_t pinMap[16][2] = {  // [MP_PORT (=USB port number)][MP_STATE (=on/off)]
+static uint8_t pinOutputMap[16][2] = {  // [MP_PORT (=USB port number)][MP_STATE (=on/off)]
   {8, 0}, {7, 0}, {6, 0}, {5, 0}, {4, 0}, {3, 0}, {2, 0}, {1, 0},
   {LED_1, 0}, {LED_2, 0}, {LED_3, 0}, {0, 0}, {0, 0}, {0, 0}, {10, 0}, {9, 0}
 };
 
+// Output_X_active - oaX, Output_X_fault = ofX
+//Pins 1-24: oa5, oa6, oa7, oa8, oa4, oa3, oa2, oa1, 
+//           of3, of4, of5, of6, of1, of2, oa10, oa9,
+//           -, -, -, -, of10, of9, of8, of7
+static uint8_t pinInputMap[24][2] = {  // [MP_PORT (=USB port number)][MP_STATE (=on/off)]
+  {5, 0}, {6, 0}, {7, 0}, {8, 0}, {4, 0}, {3, 0}, {2, 0}, {1, 0},
+  {13, 0}, {14, 0}, {15, 0}, {16, 0}, {11, 0}, {12, 0}, {10, 0}, {9, 0},
+  {0 /*test*/, 0}, {0, 0}, {0, 0}, {0, 0}, {20, 0}, {19, 0}, {18, 0}, {17, 0}
+};
+
+// verdiene over 10 er Output X fault
 
 void initUsbPorts() {
   for (int i = MP_FIRST_USB_PORT_NUMBER; i <= MP_MAX_USB_PORT_NUMBER; i++) {
@@ -80,6 +91,22 @@ uint8_t setPortStatus(uint8_t port, UsbPortStatus status) {
     return MP_ERROR_ILLEGAL_PORT_NUMBER;
   }
   usbPorts[port]->status = status;
+  return MP_SUCCESS;
+}
+
+uint8_t getState(uint8_t port, uint8_t *state) {
+  if (port < MP_FIRST_USB_PORT_NUMBER || port > MP_MAX_USB_PORT_NUMBER) {
+    return MP_ERROR_ILLEGAL_PORT_NUMBER;
+  }
+  *state = usbPorts[port]->state;
+  return MP_SUCCESS;
+}
+
+uint8_t setState(uint8_t port, uint8_t state) {
+  if (port < MP_FIRST_USB_PORT_NUMBER || port > MP_MAX_USB_PORT_NUMBER) {
+    return MP_ERROR_ILLEGAL_PORT_NUMBER;
+  }
+  usbPorts[port]->state = state;
   return MP_SUCCESS;
 }
 
@@ -135,7 +162,12 @@ uint8_t decrementChargingTicks(uint8_t port, int16_t *ticks) {
 uint8_t allocateFreePort(uint8_t *port) {
 
   for (int i = MP_FIRST_USB_PORT_NUMBER; i <= MP_MAX_USB_PORT_NUMBER; i++) {
-    if (usbPorts[i]->status == MP_AVAILABLE) {
+    bool free = false;
+    if (usbPorts[i]->status == MP_QUARANTINE && usbPorts[i]->state != MP_OUTPUT_X_ACTIVE)
+      free = true;
+    if (!free && usbPorts[i]->status == MP_AVAILABLE)
+      free = true;
+    if (free) {
       usbPorts[i]->status = MP_FREE_CHARGE;
       *port = i;
       return MP_SUCCESS;
@@ -173,31 +205,31 @@ uint8_t turnLedOnOff(uint8_t led, uint8_t onOff) {
   nrf_gpio_pin_clear(IC_SER_P0_10);
 
   for (uint8_t i = 0; i < 16; i++) {
-    if (pinMap[i][MP_PORT] >= MP_FIRST_USB_PORT_NUMBER && pinMap[i][MP_PORT] <= MP_MAX_USB_PORT_NUMBER){
-      uint8_t _status;
+    if (pinOutputMap[i][MP_PORT] >= MP_FIRST_USB_PORT_NUMBER && pinOutputMap[i][MP_PORT] <= MP_MAX_USB_PORT_NUMBER) {
+      uint8_t status;
 
-      if (getPortStatus(pinMap[i][MP_PORT], &_status) != MP_SUCCESS)
+      if (getPortStatus(pinOutputMap[i][MP_PORT], &status) != MP_SUCCESS)
         break;
-      if (_status == MP_FREE_CHARGE || _status == MP_ACTIVE_CHARGE) {
+      if (status == MP_FREE_CHARGE || status == MP_ACTIVE_CHARGE) {
         // Set SER high
-        pinMap[i][MP_STATE] = MP_POWER_ON;
+        pinOutputMap[i][MP_STATE] = MP_POWER_ON;
       }
       else {
         // Set SER low
-        pinMap[i][MP_STATE] = MP_POWER_OFF;
+        pinOutputMap[i][MP_STATE] = MP_POWER_OFF;
       }
     }
-    else if (pinMap[i][MP_PORT] >= LED_START && pinMap[i][MP_PORT] <= LED_STOP) {
-      if (pinMap[i][MP_PORT] == led) {
-        pinMap[i][MP_STATE] = onOff;
+    else if (pinOutputMap[i][MP_PORT] >= LED_START && pinOutputMap[i][MP_PORT] <= LED_STOP) {
+      if (pinOutputMap[i][MP_PORT] == led) {
+        pinOutputMap[i][MP_STATE] = onOff;
       }
       else {
         // TODO: get LED state
-        //pinMap[i][MP_STATE] = getLedState(led);
+        //pinOutputMap[i][MP_STATE] = getLedState(led);
       }
     }
-    //NRF_LOG_INFO("turnLedOnOff: pin=%d, on/off=%d", i, pinMap[i][MP_STATE]);
-    if (pinMap[i][MP_STATE] == MP_POWER_ON){
+    //NRF_LOG_INFO("turnLedOnOff: pin=%d, on/off=%d", i, pinOutputMap[i][MP_STATE]);
+    if (pinOutputMap[i][MP_STATE] == MP_POWER_ON){
       nrf_delay_ms(MP_GPIO_DELAY);
       nrf_gpio_pin_set(IC_SER_P0_10);
     }
@@ -220,7 +252,7 @@ uint8_t turnLedOnOff(uint8_t led, uint8_t onOff) {
 }
 
 uint8_t turnPowerOnOff(uint8_t port, uint8_t onOff) {
-  NRF_LOG_INFO("turnPowerOnOff: port=%d, on/off=%d", port, onOff);
+  //NRF_LOG_INFO("turnPowerOnOff: port=%d, on/off=%d", port, onOff);
   if (port < MP_FIRST_USB_PORT_NUMBER || port > MP_MAX_USB_PORT_NUMBER) {
     return MP_ERROR_ILLEGAL_PORT_NUMBER;
   }
@@ -231,28 +263,28 @@ uint8_t turnPowerOnOff(uint8_t port, uint8_t onOff) {
   nrf_gpio_pin_clear(IC_SER_P0_10);
 
   for (uint8_t i = 0; i < 16; i++) {
-    if (pinMap[i][MP_PORT] == port) {
-      pinMap[i][MP_STATE] = onOff;
+    if (pinOutputMap[i][MP_PORT] == port) {
+      pinOutputMap[i][MP_STATE] = onOff;
     }
-    else if (pinMap[i][MP_PORT] >= MP_FIRST_USB_PORT_NUMBER && pinMap[i][MP_PORT] <= MP_MAX_USB_PORT_NUMBER){
-      uint8_t _status;
+    else if (pinOutputMap[i][MP_PORT] >= MP_FIRST_USB_PORT_NUMBER && pinOutputMap[i][MP_PORT] <= MP_MAX_USB_PORT_NUMBER){
+      uint8_t status;
 
-      if (getPortStatus(pinMap[i][MP_PORT], &_status) != MP_SUCCESS)
+      if (getPortStatus(pinOutputMap[i][MP_PORT], &status) != MP_SUCCESS)
         break;
-      if (_status == MP_FREE_CHARGE || _status == MP_ACTIVE_CHARGE) {
+      if (status == MP_FREE_CHARGE || status == MP_ACTIVE_CHARGE) {
         // Set SER high
-        pinMap[i][MP_STATE] = MP_POWER_ON;
+        pinOutputMap[i][MP_STATE] = MP_POWER_ON;
       } else {
         // Set SER low
-        pinMap[i][MP_STATE] = MP_POWER_OFF;
+        pinOutputMap[i][MP_STATE] = MP_POWER_OFF;
       }
     }
-    else if (pinMap[i][MP_PORT] >= LED_START && pinMap[i][MP_PORT] <= LED_STOP) {
+    else if (pinOutputMap[i][MP_PORT] >= LED_START && pinOutputMap[i][MP_PORT] <= LED_STOP) {
       // TODO: get LED state
-      //pinMap[i][MP_STATE] = getLedState(led);
+      //pinOutputMap[i][MP_STATE] = getLedState(led);
     }
-    //NRF_LOG_INFO("turnPowerOnOff: pin=%d, on/off=%d", i, pinMap[i][MP_STATE]);
-    if (pinMap[i][MP_STATE] == MP_POWER_ON){
+    //NRF_LOG_INFO("turnPowerOnOff: pin=%d, on/off=%d", i, pinOutputMap[i][MP_STATE]);
+    if (pinOutputMap[i][MP_STATE] == MP_POWER_ON){
       nrf_delay_ms(MP_GPIO_DELAY);
       nrf_gpio_pin_set(IC_SER_P0_10);
     }
@@ -276,6 +308,7 @@ uint8_t turnPowerOnOff(uint8_t port, uint8_t onOff) {
 
 uint8_t freeUsbPort(uint8_t port) {
   //turn off power of USB port and send BLE notification
+  uint8_t status;
   uint16_t connHandle;
   uint16_t charHandle = m_ble_mp.alert_char_handles.value_handle; // Should be alert charact4eristic
   uint32_t alertMsg;
@@ -295,71 +328,94 @@ uint8_t freeUsbPort(uint8_t port) {
   } else {
     NRF_LOG_INFO("freeUsbPort: getConnHandle failed withe error code %d", ret);
   }
-  initPortStatus(port, MP_AVAILABLE, 0, BLE_CONN_HANDLE_INVALID);
+
+  ret = getPortStatus(port, &status);
+  if (ret == MP_SUCCESS && status == MP_FREE_CHARGE)
+    initPortStatus(port, MP_QUARANTINE, MP_QUARANTINE_TIME, BLE_CONN_HANDLE_INVALID);
+  else
+    initPortStatus(port, MP_AVAILABLE, 0, BLE_CONN_HANDLE_INVALID);
 }
 
 void resetInputShiftRegister() {
   // Reset to start on 'Output 1 active' - set P0.19 low - high 
-  nrf_delay_ms(1);
+  nrf_delay_ms(MP_GPIO_DELAY);
   nrf_gpio_pin_clear(SHIFT_REGISTER_P0_19);
-  nrf_delay_ms(1);
+  nrf_delay_ms(MP_GPIO_DELAY);
   nrf_gpio_pin_set(SHIFT_REGISTER_P0_19);
-  // Repeat sequence to ensure reset is done 
-    nrf_delay_ms(1);
+  // Repeat sequence n times to ensure reset is done 
+  nrf_delay_ms(MP_GPIO_DELAY);
   nrf_gpio_pin_clear(SHIFT_REGISTER_P0_19);
-  nrf_delay_ms(1);
+  nrf_delay_ms(MP_GPIO_DELAY);
   nrf_gpio_pin_set(SHIFT_REGISTER_P0_19);
-  nrf_delay_ms(1);
+  nrf_delay_ms(MP_GPIO_DELAY);
   nrf_gpio_pin_clear(SHIFT_REGISTER_P0_19);
-  nrf_delay_ms(1);
+  nrf_delay_ms(MP_GPIO_DELAY);
   nrf_gpio_pin_set(SHIFT_REGISTER_P0_19);
 }
 
 void toggleInputShiftRegister(uint8_t port) {
   resetInputShiftRegister();
-  for (uint8_t i = 1; i < port; i++) {
+  for (uint8_t i = 0; i < 24; i++) {
     // Toggle P0.18 high/low port-1 times to select port
-    nrf_delay_ms(1);
+    if (pinInputMap[i][MP_PORT] == port)
+      break;
+    nrf_delay_ms(MP_GPIO_DELAY);
     nrf_gpio_pin_set(SHIFT_REGISTER_P0_18);
-    nrf_delay_ms(1);
+    nrf_delay_ms(MP_GPIO_DELAY);
     nrf_gpio_pin_clear(SHIFT_REGISTER_P0_18);
   }
 }
 
 // Check "Output X fault"
 uint8_t checkUsbPortFault(uint8_t port) {
-  //resetInputShiftRegister();
-  toggleInputShiftRegister(port+10);
-  uint8_t fault_status = nrf_gpio_pin_read(SHIFT_REGISTER_P0_20);
-  // Returns 0 if "Output X fault" not has fault.
-  return fault_status;
+//  for (uint8_t i = 0; i < 24; i++) {
+//    // Toggle P0.18 high/low port-1 times to select port
+//    if (pinInputMap[i][MP_PORT] == port + MP_OUTPUT_X_FAULT)
+//      break;
+//    nrf_delay_ms(MP_GPIO_DELAY);
+//    nrf_gpio_pin_set(SHIFT_REGISTER_P0_18);
+//    nrf_delay_ms(MP_GPIO_DELAY);
+//    nrf_gpio_pin_clear(SHIFT_REGISTER_P0_18);
+//  }
+  toggleInputShiftRegister(port + MP_OUTPUT_X_FAULT);
+  nrf_delay_ms(1);
+  uint8_t fault = nrf_gpio_pin_read(SHIFT_REGISTER_P0_20);
+  // Returns 1 if "Output X fault", else 0
+  return fault;
 }
 
-int8_t readUsbPortStatus(uint8_t port) {
-  int8_t portStatus = 0;
+int8_t readUsbPortState(uint8_t port) {
+  int8_t state = 0;
 
-  //resetInputShiftRegister();
-  portStatus = checkUsbPortFault(port);
-  if (portStatus == 0) {
+  uint8_t fault = checkUsbPortFault(port);
+  if (fault == 0) {
     toggleInputShiftRegister(port);
-    // Returns 0 (low), if "Output X active" is not activated, and 1 (high) if activated
     nrf_delay_ms(1);
-    uint8_t pin_status = nrf_gpio_pin_read(SHIFT_REGISTER_P0_20);
+    // Returns 0 (low) if "Output X active" is not active, and 1 (high) if active
+    state = nrf_gpio_pin_read(SHIFT_REGISTER_P0_20);
+    //if (state != 0)
+    //  NRF_LOG_INFO("readUsbPortState: port %d Output_X_active", port);
   } else {
-    NRF_LOG_INFO("readUsbPortStatus fault: port %d - status %d", port, portStatus);
+    //NRF_LOG_INFO("readUsbPortState: port %d Output_X_fault", port);
     // Output X fault, return -1
-    portStatus = -1;
+    state = MP_STATE_OUTPUT_X_FAULT;
   }
-  return portStatus;
+  return state;
 }
 
 static uint8_t pollCounter = 0;
 
-void checkUsbPorts() {
+void _checkUsbPorts() {
   // Check if any USB ports have used up free charging time / charging time
+  UsbPortStatus status;
+  int16_t ticks = 0;
   uint8_t ret;
-  int16_t ticks;
 
+  // Check if any USB ports should be freed because a timeout periode has been reached.
+  // A timeout periode can be
+  //    - a paid charge time periode
+  //    - a free charge time periode
+  //    - a quarantine time periode
   for (uint8_t port = MP_FIRST_USB_PORT_NUMBER; port <= MP_MAX_USB_PORT_NUMBER; port++) {
     ret = decrementChargingTicks(port, &ticks);
     if (ret == MP_SUCCESS && ticks < 0) {
@@ -367,18 +423,164 @@ void checkUsbPorts() {
     }
   }
 
-  // Just for testing
-  //turnLedOnOff(LED_1, pollCounter % 2);
-
+  // Check USB port state each n seconds
   if (pollCounter++ == 2) {
     pollCounter = 0;
     for (uint8_t port = MP_FIRST_USB_PORT_NUMBER; port <= MP_MAX_USB_PORT_NUMBER; port++) {
-      int8_t portStatus = readUsbPortStatus(port);
-      //NRF_LOG_INFO("checkUsbPorts: port %d - status %d", port, portStatus);
+      uint8_t ret = getPortStatus(port, &status);
+
+      // MUST turn power off to read port state (Output_X_Active)
+      turnPowerOnOff(port, MP_POWER_OFF);
+
+      int8_t state = readUsbPortState(port);
+      if (state != MP_STATE_OUTPUT_X_FAULT) {
+        setState(port, state);
+
+        switch (status) {
+        case MP_AVAILABLE:
+          if (state == MP_OUTPUT_X_ACTIVE) {
+            // Turn power on for a free charge periode
+            initPortStatus(port, MP_FREE_CHARGE, MP_FREE_CHARGE_TIME, BLE_CONN_HANDLE_INVALID);
+            turnPowerOnOff(port, MP_POWER_ON);
+            getRamainingChargeTicks(port, &ticks);
+            NRF_LOG_INFO("checkUsbPorts: port %d MP_AVAILABLE, device connected", port);
+          }
+          break;
+        case MP_ACTIVE_CHARGE:
+          getRamainingChargeTicks(port, &ticks);
+          if (state == MP_OUTPUT_X_ACTIVE) {
+            NRF_LOG_INFO("checkUsbPorts: port %d MP_ACTIVE_CHARGE, device connected, %d seconds left", port, ticks);
+            turnPowerOnOff(port, MP_POWER_ON);
+          } else {
+            NRF_LOG_INFO("checkUsbPorts: port %d MP_ACTIVE_CHARGE, device disconnected, %d seconds left", port, ticks);
+            //freeUsbPort(port);
+          }
+          break;
+        case MP_FREE_CHARGE:
+          getRamainingChargeTicks(port, &ticks);
+          if (state == MP_OUTPUT_X_ACTIVE) {
+            NRF_LOG_INFO("checkUsbPorts: port %d MP_FREE_CHARGE, device connected, %d seconds left", port, ticks);
+          } else {
+            NRF_LOG_INFO("checkUsbPorts: port %d MP_FREE_CHARGE, device disconnected, %d seconds left", port, ticks);
+            freeUsbPort(port);
+          }
+          break;
+        case MP_QUARANTINE:
+          getRamainingChargeTicks(port, &ticks);
+          NRF_LOG_INFO("checkUsbPorts: port %d MP_QUARANTINE, %d seconds left", port, ticks);
+          break;
+        default:
+          break;
+        }
+      } else {
+        NRF_LOG_INFO("checkUsbPorts: port %d Output_X_Fault", port);
+      }
     }
   }
 
 }
+
+uint8_t getStateFromInputMap(port) {
+  for (uint8_t i = 0; i < 24; i++) {
+   if (pinInputMap[i][MP_PORT] == port)
+     return pinInputMap[i][MP_STATE];
+  }
+  return 0;
+}
+
+void checkUsbPorts() {
+  UsbPortStatus status;
+  int16_t ticks;
+  uint8_t ret;
+
+  // Check if any USB ports should be freed because a timeout periode has been reached.
+  // A timeout periode can be
+  //    - a paid charge time periode
+  //    - a free charge time periode
+  //    - a quarantine time periode
+  for (uint8_t port = MP_FIRST_USB_PORT_NUMBER; port <= MP_MAX_USB_PORT_NUMBER; port++) {
+    ret = decrementChargingTicks(port, &ticks);
+    if (ret == MP_SUCCESS && ticks < 0) {
+      freeUsbPort(port);
+    }
+  }
+
+  if (pollCounter++ == 4) {
+    uint16_t ticks;
+    pollCounter = 0;
+
+    // Read out the current port states (Output_X_Active)
+    resetInputShiftRegister();
+    for (uint8_t i = 0; i < 24; i++) {
+      uint8_t port = pinInputMap[i][MP_PORT];
+      
+      if (port >= MP_FIRST_USB_PORT_NUMBER && port <= MP_MAX_USB_PORT_NUMBER) {
+        // MUST turn power off to read state (Output_X_Active)
+        turnPowerOnOff(port, MP_POWER_OFF);
+      }
+      
+      // Returns 0 (low), if "Output X active" is not activated, and 1 (high) if activated
+      pinInputMap[i][MP_STATE] = nrf_gpio_pin_read(SHIFT_REGISTER_P0_20);
+      
+      // Toggle P0.18 high/low to select next port
+      nrf_delay_ms(MP_GPIO_DELAY);
+      nrf_gpio_pin_set(SHIFT_REGISTER_P0_18);
+      nrf_delay_ms(MP_GPIO_DELAY);
+      nrf_gpio_pin_clear(SHIFT_REGISTER_P0_18);
+    }
+
+    for (uint8_t port = MP_FIRST_USB_PORT_NUMBER; port <= MP_MAX_USB_PORT_NUMBER; port++) {
+      uint8_t ret = getPortStatus(port, &status);
+      // Check if port has fault (Output_X_Fault)
+      ret = getStateFromInputMap(port + MP_OUTPUT_X_FAULT);
+      if (ret == 0) {
+        int8_t state = getStateFromInputMap(port);
+        setState(port, state);
+
+        switch (status) {
+        case MP_AVAILABLE:
+          if (state == MP_OUTPUT_X_ACTIVE) {
+            // Turn power on for a free charge periode
+            initPortStatus(port, MP_FREE_CHARGE, MP_FREE_CHARGE_TIME, BLE_CONN_HANDLE_INVALID);
+            turnPowerOnOff(port, MP_POWER_ON);
+            getRamainingChargeTicks(port, &ticks);
+            NRF_LOG_INFO("checkUsbPorts: port %d MP_AVAILABLE, device connected", port);
+          }
+          break;
+        case MP_ACTIVE_CHARGE:
+          getRamainingChargeTicks(port, &ticks);
+          if (state == MP_OUTPUT_X_ACTIVE) {
+            NRF_LOG_INFO("checkUsbPorts: port %d MP_ACTIVE_CHARGE, device connected, %d seconds left", port, ticks);
+            turnPowerOnOff(port, MP_POWER_ON);
+          } else {
+            NRF_LOG_INFO("checkUsbPorts: port %d MP_ACTIVE_CHARGE, device disconnected, %d seconds left", port, ticks);
+            //freeUsbPort(port);
+          }
+          break;
+        case MP_FREE_CHARGE:
+          getRamainingChargeTicks(port, &ticks);
+          if (state == MP_OUTPUT_X_ACTIVE) {
+            NRF_LOG_INFO("checkUsbPorts: port %d MP_FREE_CHARGE, device connected, %d seconds left", port, ticks);
+          } else {
+            NRF_LOG_INFO("checkUsbPorts: port %d MP_FREE_CHARGE, device disconnected, %d seconds left", port, ticks);
+            freeUsbPort(port);
+          }
+          break;
+        case MP_QUARANTINE:
+          getRamainingChargeTicks(port, &ticks);
+          NRF_LOG_INFO("checkUsbPorts: port %d MP_QUARANTINE, %d seconds left", port, ticks);
+          break;
+        default:
+          break;
+        }
+      } else {
+        NRF_LOG_INFO("checkUsbPorts: port %d Output_X_Fault", port);
+      }
+    }
+  }
+
+}
+
 
 void onNewCommand(ble_evt_t const *p_ble_evt) {
   // Write event - decode the data set by client:
@@ -397,7 +599,7 @@ void onNewCommand(ble_evt_t const *p_ble_evt) {
   uint32_t ackMsg = 0;
   uint8_t len = 4;
   uint8_t ret = MP_SUCCESS;
-  UsbPortStatus portStatus;
+  UsbPortStatus status;
 
   NRF_LOG_INFO("onNewCommand() enter");
 
@@ -430,7 +632,7 @@ void onNewCommand(ble_evt_t const *p_ble_evt) {
     return;
   }
 
-  ret = getPortStatus(port, &portStatus);
+  ret = getPortStatus(port, &status);
 
   if (ret != MP_SUCCESS) {
     NRF_LOG_INFO("Get status on port 0x%x failed, %s", port, ret)
@@ -438,15 +640,15 @@ void onNewCommand(ble_evt_t const *p_ble_evt) {
     if (command == MP_TURN_USB_POWER_ON) {
       NRF_LOG_INFO("Turn power ON on port 0x%x", port);
 
-      if (portStatus != MP_AVAILABLE && portStatus != MP_FREE_CHARGE) {
-        NRF_LOG_INFO("Illegal port status, portstatus=%d", portStatus)
+      if (status != MP_AVAILABLE && status != MP_FREE_CHARGE) {
+        NRF_LOG_INFO("Illegal port status, status=%d", status)
         ret = MP_ERROR_ILLEGAL_PORT_STATUS;
       } else {
         ret = turnPowerOnOff(port, MP_POWER_ON);
 
         // update port status
         // TODO CHANGE TIME TO ACTUAL CHARGE TIME
-        ret = initPortStatus(port, MP_ACTIVE_CHARGE, MP_TEST_TIME, connHandle);
+        ret = initPortStatus(port, MP_ACTIVE_CHARGE, MP_CHARGE_TIME, connHandle);
       }
 
     } else if (command == MP_TURN_USB_POWER_OFF) {
@@ -454,8 +656,7 @@ void onNewCommand(ble_evt_t const *p_ble_evt) {
       ret = turnPowerOnOff(port, MP_POWER_OFF);
 
       // update port status
-      // TODO CHANGE TIME TO ACTUAL CHARGE TIME
-      //ret = initPortStatus(port, MP_AVAILABLE, MP_TEST_TIME, connHandle);
+      //ret = initPortStatus(port, MP_AVAILABLE, 0, connHandle);
       ret = freeUsbPort(port);
 
     } else {
@@ -478,188 +679,39 @@ void onNewCommand(ble_evt_t const *p_ble_evt) {
   sendNotification(charHandle, connHandle, &ackMsg, len);
 
   // TODO testStuff status
-  ret = getPortStatus(port, &portStatus);
-  NRF_LOG_INFO("Port status is %x", portStatus);
+  ret = getPortStatus(port, &status);
+  NRF_LOG_INFO("Port status is %x", status);
 
   NRF_LOG_INFO("onNewCommand() leave");
 }
 
-void _onUsbPortChange(uint8_t port, uint8_t action) {
-  //TODO add USB status, ack message, ports, turn off power, turn on power, change USB status, get USB status
+void _onUsbPortChange(uint8_t pin, uint8_t action) {
+  // TODO
+  // Routine is currently disabled (nor called)
+  // Could poll port states as in checkUsbPorts()
   uint16_t connHandle = NULL;
   uint16_t charHandle = m_ble_mp.alert_char_handles.value_handle;
   uint32_t ackMsg = 0;
   uint8_t len = 4;
   uint8_t ret = MP_SUCCESS;
-  UsbPortStatus portStatus;
+  UsbPortStatus status;
 
-  NRF_LOG_INFO("onUsbChange() enter, port=%0x, action=%0x", port, action);
+  NRF_LOG_INFO("onUsbPortChange() enter, pin=%0x, action=%0x", pin, action);
 
-  ret = getPortStatus(port, &portStatus);
 
-  if (ret != MP_SUCCESS) {
-    NRF_LOG_INFO("Get port status failed, %s", ret)
-  } else {
-    ret = getConnHandle(port, &connHandle);
+  switch(action) {
+  case NRF_GPIOTE_POLARITY_LOTOHI:
+    break;
 
-    switch(action) {
-    case NRF_GPIOTE_POLARITY_LOTOHI:
-      switch(portStatus) {
-      case MP_AVAILABLE:
-        // Connected - activate free charging
-        ret = turnPowerOnOff(port, MP_POWER_ON);
-        ret = initPortStatus(port, MP_FREE_CHARGE, MP_TEST_TIME, connHandle);
-        NRF_LOG_INFO("Power LOTOHI on port %d ON - MP_AVAILABLE->MP_FREE_CHARGE", port);
-        break;
+  case NRF_GPIOTE_POLARITY_HITOLO:
+    break;
 
-      case MP_ACTIVE_CHARGE:
-        // Connected - already paid
-        ret = turnPowerOnOff(port, MP_POWER_ON);
-        NRF_LOG_INFO("Power LOTOHI on port %d ON - MP_AVAILABLE->MP_FREE_CHARGE", port);
-        break;
-
-      case MP_FREE_CHARGE:
-        // Illegal state
-        NRF_LOG_INFO("Power LOTOHI on port %d ON - MP_FREE_CHARGE", port);
-        break;
-
-      case MP_FREE_CHARGE_NOT_AVAILABLE:
-      default:
-        // Free port
-        ret = turnPowerOnOff(port, MP_POWER_OFF);
-        NRF_LOG_INFO("Power LOTOHI on port %d ON - MP_FREE_CHARGE_NOT_AVAILABLE", port);
-        break;
-      }
-      break;
-
-    case NRF_GPIOTE_POLARITY_HITOLO:
-      switch(portStatus) {
-      case MP_AVAILABLE:
-        // Illegal state
-        break;
-
-      case MP_ACTIVE_CHARGE:
-        // Disconnected - paid for
-        break;
-
-      case MP_FREE_CHARGE:
-        // Disconnected - not paid for
-        // Should block port for some time to prevent misuse
-        break;
-
-      case MP_FREE_CHARGE_NOT_AVAILABLE:
-      default:
-        // Free blocking
-        break;
-      }
-      break;
-
-    case NRF_GPIOTE_POLARITY_TOGGLE:
-    default:
-      switch(portStatus) {
-      case MP_AVAILABLE:
-        // Going from idle to active
-        break;
-
-      case MP_ACTIVE_CHARGE:
-        // Disconnected - paid for
-        break;
-
-      case MP_FREE_CHARGE:
-        // Disconnected - not paid for
-        // Should block port for some time to prevent misuse
-        break;
-
-      case MP_FREE_CHARGE_NOT_AVAILABLE:
-      default:
-        // Free blocking
-        break;
-      }
-
-      break;
-    }
+  case NRF_GPIOTE_POLARITY_TOGGLE:
+  default:
+    break;
   }
 
-  // Send ack/nack message
-  if (ret == MP_SUCCESS) {
-    // send ack
-    ackMsg = (port << 8) | MP_SUCCESS;
-  } else {
-    // send nack
-    ackMsg = (ret << 8) | MP_ERROR;
-  }
-
-  NRF_LOG_INFO("onUsbChange() leave");
-}
-
-void onUsbPortChange(uint8_t port, uint8_t action) {
-  //TODO add USB status, ack message, ports, turn off power, turn on power, change USB status, get USB status
-  uint16_t connHandle = NULL;
-  uint16_t charHandle = m_ble_mp.alert_char_handles.value_handle;
-  uint32_t ackMsg = 0;
-  uint8_t len = 4;
-  uint8_t ret = MP_SUCCESS;
-  UsbPortStatus portStatus;
-
-  NRF_LOG_INFO("onUsbChange() enter, port=%0x, action=%0x", port, action);
-
-  ret = getPortStatus(port, &portStatus);
-
-  if (ret != MP_SUCCESS) {
-    NRF_LOG_INFO("Get port status failed, %s", ret)
-  } else {
-    ret = getConnHandle(port, &connHandle);
-
-    // update port status
-    // TODO CHANGE TIME TO ACTUAL CHARGE TIME
-    if (portStatus == MP_AVAILABLE) {
-      NRF_LOG_INFO("Turn power ON on port %x", port);
-      ret = turnPowerOnOff(port, MP_POWER_ON);
-
-      ret = initPortStatus(port, MP_FREE_CHARGE, MP_TEST_TIME, connHandle);
-      NRF_LOG_INFO("Set portStatus to MP_FREE_CHARGE");
-
-    } else if (portStatus == MP_ACTIVE_CHARGE) {
-      NRF_LOG_INFO("Turn power OFF on port %x", port);
-
-      ret = turnPowerOnOff(port, MP_POWER_OFF);
-
-      ret = freeUsbPort(port);
-      NRF_LOG_INFO("Set portStatus to MP_AVAILABLE");
-
-    } else if (portStatus == MP_FREE_CHARGE) {
-      NRF_LOG_INFO("Turn power OFF on port %x", port);
-
-      ret = turnPowerOnOff(port, MP_POWER_OFF);
-
-      ret = freeUsbPort(port);
-      NRF_LOG_INFO("Set portStatus to MP_FREE_CHARGE_NOT_AVAILABLE");
-    }
-  }
-  // Send ack/nack message
-  if (ret == MP_SUCCESS) {
-    // send ack
-    ackMsg = (port << 8) | MP_SUCCESS;
-  } else {
-    // send nack
-    ackMsg = (ret << 8) | MP_ERROR;
-  }
-  ackMsg = (ackMsg << 8) | m_ble_mp.location_id;
-
-  if (connHandle != NULL) {
-    sendNotification(charHandle, connHandle, &ackMsg, len);
-  } else {
-    ble_conn_state_conn_handle_list_t conn_handles = ble_conn_state_periph_handles();
-    // TODO: Send endring i port-status til alle som er oppkoblet
-    for (uint8_t i = 0; i < conn_handles.len; i++) {
-      sendNotification(charHandle, conn_handles.conn_handles[i], &ackMsg, len);
-    }
-  }
-  // TODO testStuff status
-  ret = getPortStatus(port, &portStatus);
-  NRF_LOG_INFO("Port status is %x", portStatus);
-
-  NRF_LOG_INFO("onUsbChange() leave");
+  NRF_LOG_INFO("onUsbPortChange() leave");
 }
 
 void onBleDisconnect(ble_evt_t const *p_ble_evt) {

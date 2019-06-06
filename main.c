@@ -142,15 +142,12 @@
 #endif
 
 void inPinHandler(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t action) {
-    NRF_LOG_INFO("in_pin_handler; pin=%d, action=%d", pin, action);
-    
-    //onUsbPortChange(pin - (PIN_IN_START-1), action);
-
-    //TODO: endring av port status med notifikasjon på ALERT karakteristikk
+    //NRF_LOG_INFO("inPinHandler: pin=%d, action=%d", pin, action);
+    //onUsbPortChange(pin, action);
 }
 
 /**
- * @brief Function for configuring: PIN_IN pin for input, PIN_OUT pin for output,
+ * @brief Function for configuring: P0_xx pin for input, P0_20 pin for output,
  * and configures GPIOTE to give an interrupt on pin change.
  */
 
@@ -160,12 +157,16 @@ static void gpio_init(void) {
   err_code = nrf_drv_gpiote_init();
   APP_ERROR_CHECK(err_code);
 
-  NRF_LOG_INFO("GPIO init start");
   nrf_drv_gpiote_out_config_t out_config = GPIOTE_CONFIG_OUT_SIMPLE(false);
   nrf_drv_gpiote_in_config_t in_config = GPIOTE_CONFIG_IN_SENSE_TOGGLE(true);
   in_config.pull = NRF_GPIO_PIN_PULLUP;
+//  nrf_drv_gpiote_in_config_t in_config = {
+//    .sense = NRF_GPIOTE_POLARITY_TOGGLE,  //NRF_GPIOTE_POLARITY_LOTOHI,
+//    .pull = NRF_GPIO_PIN_PULLUP,          //NRF_GPIO_PIN_NOPULL
+//    .is_watcher = false,
+//    .hi_accuracy = false
+//  };
 
-  NRF_LOG_INFO("GPIO init 1");
   err_code = nrf_drv_gpiote_out_init(IC_SRCLK_P0_8, &out_config);
   APP_ERROR_CHECK(err_code);
   err_code = nrf_drv_gpiote_out_init(IC_RCLK_P0_9, &out_config);
@@ -177,13 +178,12 @@ static void gpio_init(void) {
   err_code = nrf_drv_gpiote_out_init(SHIFT_REGISTER_P0_19, &out_config);
   APP_ERROR_CHECK(err_code);
 
-  NRF_LOG_INFO("GPIO init 2");
   err_code = nrf_drv_gpiote_in_init(SHIFT_REGISTER_P0_20, &in_config, inPinHandler);
   APP_ERROR_CHECK(err_code);
+  //nrf_gpio_cfg_input(SHIFT_REGISTER_P0_20, NRF_GPIO_PIN_NOPULL);
 
   nrf_drv_gpiote_in_event_enable(SHIFT_REGISTER_P0_20, true);
-
-  NRF_LOG_INFO("GPIO init end");
+  //NRF_LOG_INFO("gpio_init: end");
 }
 
 /**@brief   Priority of the application BLE event handler.
@@ -239,10 +239,10 @@ static void leds_init(void) {
   bsp_board_init(BSP_INIT_LEDS);
 }
 
-// Declare an app_timer id variable and define our timer interval and define a timer interval
+// Declare an app_timer id variable and define our timer interval
 APP_TIMER_DEF(m_mp_char_timer_id);
 #define MP_CHAR_TIMER_INTERVAL APP_TIMER_TICKS(1000) // 1000 ms intervals
-static uint8_t port_status_announcer_counter = 5;
+static uint8_t port_status_announcer_counter = MP_SEND_PORT_STATUS_INTERVAL;
 
 /**@brief Function for Timer event handler
  */
@@ -250,7 +250,7 @@ static void timer_timeout_handler(void *p_context) {
   checkUsbPorts();
   if (port_status_announcer_counter == 0) {
     sendPortStatusToAll(&m_ble_mp);
-    port_status_announcer_counter = 10;
+    port_status_announcer_counter = MP_SEND_PORT_STATUS_INTERVAL;
   } else {
     port_status_announcer_counter--;
   }

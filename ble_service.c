@@ -356,7 +356,7 @@ void sendNotification(uint16_t charHandle, uint16_t connHandle, uint32_t *p_data
     hvx_params.p_len = &len;
     hvx_params.p_data = p_data;
 
-    NRF_LOG_INFO("sendNotification: connHandle=%0x, len=%d, value=%0x", connHandle, len, *p_data);
+    NRF_LOG_INFO("sendNotification: connHandle=0x%0x, len=%d, value=0x%0x", connHandle, len, *p_data);
 
     sd_ble_gatts_hvx(connHandle, &hvx_params);
   }

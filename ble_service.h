@@ -14,10 +14,12 @@
 #define BLE_UUID_MP_SERVICE     0xF00D                                                                   // Just a random, but recognizable value
 
 // Defining 16-bit characteristic UUID
-#define BLE_UUID_MP_CMD_CHAR    0xBEEE // Just a random, but recognizable value
-#define BLE_UUID_MP_ALERT_CHAR  0xBEEF // Just a random, but recognizable value
+#define BLE_UUID_MP_CMD_CHAR    0xBEEE  // Just a random, but recognizable value
+#define BLE_UUID_MP_ALERT_CHAR  0xBEEF  // Just a random, but recognizable value
 
 #define BLE_MAX_MESSAGE_SIZE    31
+
+#define MP_SEND_PORT_STATUS_INTERVAL 5    // Send USB port status every n seconds
 
 // This structure contains various status information for our service.
 // The name is based on the naming convention used in Nordics SDKs.

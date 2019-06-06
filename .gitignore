@@ -1,2 +1,6 @@
 pca10040/s132/ses/Output/
 *.o
+*.d
+*.hex
+*.elf
+*.map

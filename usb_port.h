@@ -6,13 +6,14 @@
 
 typedef enum {
   MP_AVAILABLE = 0,
-  MP_FREE_CHARGE,              // Port busy but not yet paid for
-  MP_ACTIVE_CHARGE,            // Port active; port busy and paid for
-  MP_FREE_CHARGE_NOT_AVAILABLE // port busy; free charging time expired
+  MP_FREE_CHARGE,               // Port busy but not yet paid for
+  MP_ACTIVE_CHARGE,             // Port active; port busy and paid for
+  MP_QUARANTINE,                // port quarantine; free charging time expired
 } UsbPortStatus;
 
 typedef struct {
   UsbPortStatus status;
+  uint8_t state;                // Output X Active = 0/1
   int16_t remainingChargeTicks;
   int16_t notAvailableTicks;
   uint16_t connHandle;
@@ -49,18 +50,21 @@ typedef struct {
 #define MP_MAX_USB_PORT_NUMBER 10
 #define MP_GPIO_DELAY 3          // ms to wait before executing GPIO operation
 
-//TODO Test data
-#define MP_TEST_TIME                        (0.5*60)        // 6 sek
-#define MP_MAX_CHARGE_TIME                  (MP_TEST_TIME)  //(60*60) // 1 time
-#define MP_MAX_FREE_TIME                    (MP_TEST_TIME)  //(5*60)  // 5 min
-#define MP_FREE_CHARGE_NOT_AVAILABLE_TIME   (MP_TEST_TIME)  //(60*60) // 1 time
+//TODO Change Test times
+#define MP_CHARGE_TIME        (1*60)    //(60*60) // 1 time
+#define MP_FREE_CHARGE_TIME   (30)  //(5*60)  // 5 min
+#define MP_QUARANTINE_TIME    (60)    //(15*60) // 15 min
 
 #define MP_POWER_ON 1
 #define MP_POWER_OFF 0
+#define MP_OUTPUT_X_ACTIVE 1
+#define MP_OUTPUT_X_FAULT 10
+#define MP_STATE_OUTPUT_X_FAULT -1
 
 #define SHIFT_REGISTER_P0_18 18
 #define SHIFT_REGISTER_P0_19 19
 #define SHIFT_REGISTER_P0_20 20
+//#define SHIFT_REGISTER_P0_20 14
 
 #define IC_SRCLK_P0_8   8
 #define IC_RCLK_P0_9    9
